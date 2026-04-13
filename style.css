@@ -48,6 +48,7 @@ body {
     color: white;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
     z-index: 10;
+    pointer-events: none; /* Ensure taps pass through to the game container */
 }
 #message {
     position: absolute;
