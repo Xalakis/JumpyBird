@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jumpy Bird</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="main-layout">
+        <div id="side-panel">
+            <div id="high-scores-container">
+                <h3>TOP 5 RUNS</h3>
+                <div id="high-scores-list"></div>
+            </div>
+        </div>
+
+        <div id="game-container">
+            <!-- The live score display -->
+            <div id="score">Score: 0</div>
+            
+            <!-- The game world -->
+            <canvas id="gameCanvas"></canvas>
+            
+            <!-- The overlay for "Press Space" and "Game Over" -->
+            <div id="message">Press Space to Jump</div>
+        </div>
+    </div>
+    <!-- 
+        NOTE: 'type="module"' is required because game.js 
+        uses ES6 imports to load the other files.
+    -->
+    <script type="module" src="src/game.js"></script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
