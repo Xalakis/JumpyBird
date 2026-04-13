@@ -49,21 +49,27 @@ class Game {
         this.displayHighScores();
 
         // Bind Event Listeners
-        window.addEventListener('keydown', (e) => this.handleInput(e));
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') this.handleAction();
+        });
+
+        this.canvas.addEventListener('pointerdown', (e) => {
+            // Prevent default touch behavior like zooming or scrolling on the canvas
+            if (e.cancelable) e.preventDefault();
+            this.handleAction();
+        });
     }
 
-    handleInput(e) {
-        if (e.code === 'Space') {
-            if (this.isCooldown) return;
+    handleAction() {
+        if (this.isCooldown) return;
 
-            if (!this.gameStarted) {
-                this.startGame();
-            } else if (this.isGameOver) {
-                this.resetGame();
-            } else {
-                this.bird.jump();
-                this.audio.play('jump');
-            }
+        if (!this.gameStarted) {
+            this.startGame();
+        } else if (this.isGameOver) {
+            this.resetGame();
+        } else {
+            this.bird.jump();
+            this.audio.play('jump');
         }
     }
 
@@ -398,7 +404,7 @@ class Game {
         this.audio.play('gameOver');
         this.messageElement.classList.add('game-over');
         this.messageElement.style.display = 'block';
-        this.messageElement.innerHTML = `GAME OVER<br>Final Score: ${this.score}<br>Press Space to Restart`;
+        this.messageElement.innerHTML = `GAME OVER<br>Final Score: ${this.score}<br>Tap or Press Space to Restart`;
         setTimeout(() => {
             this.isCooldown = false;
         }, 1000);
