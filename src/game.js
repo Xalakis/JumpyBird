@@ -43,6 +43,9 @@ class Game {
         this.powerupTargetY = 0;
         this.powerupTargetX = 0; // NEW: Stores the randomized X position
 
+        // Shield consumption guard: prevent multiple shields from being lost in one frame
+        this.shieldConsumedThisFrame = false;
+
         // High Scores
         this.highScores = JSON.parse(localStorage.getItem('jumpyBirdHighScores')) || [];
         this.highScoreListElement = document.getElementById('high-scores-list');
@@ -174,6 +177,22 @@ class Game {
         return true;
     }
 
+    // Handle collision with an entity (enemy, airplane, or obstacle)
+    // Returns true if a shield was consumed, false otherwise
+    handleCollisionWithEntity() {
+        if (this.bird.shieldCount > 0 && !this.shieldConsumedThisFrame && !this.bird.isInvincible) {
+            this.bird.shieldCount--;
+            this.shieldConsumedThisFrame = true;
+            this.bird.isInvincible = true;
+            this.bird.invincibilityTimer = 60;
+            this.audio.play('shieldPop');
+            return true;
+        } else if (!this.bird.isInvincible) {
+            this.gameOver();
+        }
+        return false;
+    }
+
     trySpawnPowerup() {
         if (this.powerups.length > 0) return;
         if (Math.random() < POWERUP_SPAWN_CHANCE) {
@@ -188,6 +207,59 @@ class Game {
         }
     }
 
+    // Check if a powerup at the given position would overlap with any obstacle (regular or airplane)
+    isPowerupPositionSafe(x, y, radius) {
+        const powerupLeft = x - radius;
+        const powerupRight = x + radius;
+        const powerupTop = y - radius;
+        const powerupBottom = y + radius;
+
+        // Check regular obstacles
+        for (const o of this.obstacles) {
+            // Check if powerup overlaps with top pipe
+            if (powerupRight > o.x && powerupLeft < o.x + o.width && powerupBottom > 0 && powerupTop < o.topHeight) {
+                return false;
+            }
+            // Check if powerup overlaps with bottom tree trunk
+            const trunkWidth = o.width * 0.4;
+            const trunkX = o.x + (o.width - trunkWidth) / 2;
+            if (powerupRight > trunkX && powerupLeft < trunkX + trunkWidth && powerupBottom > o.bottomY) {
+                return false;
+            }
+            // Check if powerup overlaps with canopy (circle)
+            const canopyCenterX = o.x + o.width / 2;
+            const canopyCenterY = o.bottomY;
+            const canopyRadius = o.width * 1.2;
+            const dx = x - canopyCenterX;
+            const dy = y - canopyCenterY;
+            if (Math.sqrt(dx * dx + dy * dy) < canopyRadius + radius) {
+                return false;
+            }
+        }
+
+        // Check airplane obstacles
+        for (const ao of this.airplaneObstacles) {
+            // Check if powerup overlaps with top planes
+            const topPlane = ao.planes[0];
+            if (topPlane) {
+                const bounds = topPlane.getBounds();
+                if (powerupRight > bounds.left && powerupLeft < bounds.right && powerupBottom > bounds.top && powerupTop < bounds.bottom) {
+                    return false;
+                }
+            }
+            // Check if powerup overlaps with bottom planes
+            const bottomPlane = ao.planes[1];
+            if (bottomPlane) {
+                const bounds = bottomPlane.getBounds();
+                if (powerupRight > bounds.left && powerupLeft < bounds.right && powerupBottom > bounds.top && powerupTop < bounds.bottom) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     update() {
         if (this.isGameOver) return;
         this.bgOffset += 0.5;
@@ -195,9 +267,16 @@ class Game {
 
         // --- POWERUP SCHEDULING ---
         if (this.nextPowerupFrame !== -1 && this.frameCount === this.nextPowerupFrame) {
-            this.powerups.push(new Powerup(this.powerupTargetX, this.powerupTargetY, 15, 'shield'));
+            const spawnRadius = 15;
+            // Final check: validate position is clear of obstacles at actual spawn time
+            if (this.isPowerupPositionSafe(this.powerupTargetX, this.powerupTargetY, spawnRadius)) {
+                this.powerups.push(new Powerup(this.powerupTargetX, this.powerupTargetY, spawnRadius, 'shield'));
+            }
             this.nextPowerupFrame = -1;
         }
+
+        // Reset shield consumption guard at the start of each frame
+        this.shieldConsumedThisFrame = false;
 
         // Obstacle or Airplane Spawning
         if (this.frameCount % OBSTACLE_SPAWN_RATE === 0) {
@@ -237,14 +316,7 @@ class Game {
             const dy = this.bird.y - e.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
             if (distance < this.bird.radius + e.radius) {
-                if (this.bird.shieldCount > 0) {
-                    this.bird.shieldCount--;
-                    this.audio.play('shieldPop');
-                    this.bird.isInvincible = true;
-                    this.bird.invincibilityTimer = 60;
-                } else if (!this.bird.isInvincible) {
-                    this.gameOver();
-                }
+                this.handleCollisionWithEntity();
             }
             if (e.x + e.radius < 0) this.enemies.splice(i, 1);
         }
@@ -260,14 +332,7 @@ class Game {
             const dy = this.bird.y - closestY;
             const distanceSquared = (dx * dx) + (dy * dy);
             if (distanceSquared < (this.bird.radius * this.bird.radius)) {
-                if (this.bird.shieldCount > 0) {
-                    this.bird.shieldCount--;
-                    this.audio.play('shieldPop');
-                    this.bird.isInvincible = true;
-                    this.bird.invincibilityTimer = 60;
-                } else if (!this.bird.isInvincible) {
-                    this.gameOver();
-                }
+                this.handleCollisionWithEntity();
             }
             if (a.x + a.width < 0) this.airplanes.splice(i, 1);
         }
@@ -288,14 +353,7 @@ class Game {
                 const distanceSquared = (dx * dx) + (dy * dy);
 
                 if (distanceSquared < (this.bird.radius * this.bird.radius)) {
-                    if (this.bird.shieldCount > 0) {
-                        this.bird.shieldCount--;
-                        this.audio.play('shieldPop');
-                        this.bird.isInvincible = true;
-                        this.bird.invincibilityTimer = 60;
-                    } else if (!this.bird.isInvincible) {
-                        this.gameOver();
-                    }
+                    this.handleCollisionWithEntity();
                 }
 
                 if (a.x + a.width < 0) ao.planes.splice(j, 1);
@@ -319,13 +377,10 @@ class Game {
             let o = this.obstacles[i];
             o.update(OBSTACLE_SPEED);
             let hitObstacle = false;
-            let hitType = null;
             if (this.bird.x + this.bird.radius > o.x && this.bird.x - this.bird.radius < o.x + o.width && this.bird.y - this.bird.radius < o.topHeight) {
                 hitObstacle = true;
-                hitType = 'top';
             } else if (this.bird.x + this.bird.radius > o.x && this.bird.x - this.bird.radius < o.x + o.width && this.bird.y + this.bird.radius > o.bottomY) {
                 hitObstacle = true;
-                hitType = 'bottom';
             } else {
                 const canopyCenterX = o.x + o.width / 2;
                 const canopyCenterY = o.bottomY;
@@ -334,22 +389,11 @@ class Game {
                 const dy = this.bird.y - canopyCenterY;
                 if (Math.sqrt(dx * dx + dy * dy) < this.bird.radius + canopyRadius) {
                     hitObstacle = true;
-                    hitType = 'bottom';
                 }
             }
 
             if (hitObstacle) {
-                if (this.bird.shieldCount > 0) {
-                    this.bird.shieldCount--;
-                    this.audio.play('shieldPop');
-                    this.bird.isInvincible = true;
-                    this.bird.invincibilityTimer = 60;
-                    if (hitType === 'top') this.bird.y = o.topHeight + this.bird.radius + 2;
-                    else this.bird.y = o.bottomY - this.bird.radius - 2;
-                    this.bird.velocity = 0;
-                } else if (!this.bird.isInvincible) {
-                    this.gameOver();
-                }
+                this.handleCollisionWithEntity();
             }
 
             if (!o.passed && o.x + o.width < this.bird.x) {
